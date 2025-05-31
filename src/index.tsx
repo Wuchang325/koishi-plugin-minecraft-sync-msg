@@ -1,7 +1,7 @@
 import { Context, Schema, Logger, h, Bot } from 'koishi'
 import { WebSocket, RawData } from 'ws'
 import { Rcon } from 'rcon-client'
-import { getListeningEvent, getSubscribedEvents, eventTrans, wsConf, rconConf } from './values'
+import { getListeningEvent, getSubscribedEvents, eventTrans, wsConf, rconConf, filterMessage } from './values'
 import mcWss from './mcwss'
 
 const logger = new Logger('minecraft-sync-msg')
@@ -248,6 +248,19 @@ class MinecraftSyncMsg {
     this.ctx.on('message', async (session) => {
       if (!this.isValidChannel(session)) return
 
+      // 检查消息是否需要过滤
+      const filterConfig = {
+        filterLongText: this.config.filterLongText,
+        maxTextLength: this.config.maxTextLength,
+        filterMedia: this.config.filterMedia
+      };
+      
+      const filterResult = filterMessage(filterConfig, session.content);
+      if (filterResult.filtered) {
+        logger.info(`消息被过滤: ${filterResult.reason}`);
+        return;
+      }
+
       if (this.isMessageCommand(session)) {
         await this.handleMessageCommand(session)
       }
@@ -391,8 +404,6 @@ class MinecraftSyncMsg {
     this.clearReconnectInterval()
   }
 }
-
-
 
 namespace MinecraftSyncMsg {
   export interface Config extends wsConf, rconConf {
