@@ -1,7 +1,7 @@
 import { Context, Logger, Schema, h, Bot } from 'koishi'
-import { WebSocketServer, WebSocket } from 'ws';
-import { IncomingMessage } from 'http';
-import { getListeningEvent, getSubscribedEvents, eventTrans, wsConf } from './values'
+import { WebSocketServer, WebSocket } from 'ws'
+import { IncomingMessage } from 'http'
+import { getListeningEvent, getSubscribedEvents, eventTrans, wsConf, filterMessage } from './values'
 
 class mcWss {
     private conf: mcWss.Config;
@@ -86,6 +86,20 @@ class mcWss {
             ctx.on('message', async (session) => {
                 if (cfg.sendToChannel.includes(`${session.platform}:${session.channelId}`) || session.platform=="sandbox") {
                   if ((session.content.startsWith(cfg.sendprefix)) && session.content != cfg.sendprefix) {
+                    
+                    // 检查消息是否需要过滤
+                    const filterConfig = {
+                        filterLongText: cfg.filterLongText,
+                        maxTextLength: cfg.maxTextLength,
+                        filterMedia: cfg.filterMedia
+                    };
+                    
+                    const filterResult = filterMessage(filterConfig, session.content);
+                    if (filterResult.filtered) {
+                        ctx.logger.info(`消息被过滤: ${filterResult.reason}`);
+                        return;
+                    }
+                    
                     let msg:string = session.content.replaceAll('&amp;', '&').replaceAll(/<\/?template>/gi,'').replaceAll(cfg.sendprefix,'');
                     try {
                         let msgData = {
