@@ -19,6 +19,10 @@ export interface wsConf {
     event: mcEvent,
     maxReconnectCount: number,
     maxReconnectInterval: number,
+    // 新增过滤配置
+    filterLongText: boolean,
+    maxTextLength: number,
+    filterMedia: boolean,
 }
 
 export const wsConf = Schema.object({
@@ -39,6 +43,17 @@ export const wsConf = Schema.object({
     .description("[仅客户端生效]客户端最大重连次数"),
     maxReconnectInterval: Schema.number().default(60000)
     .description("[仅客户端生效]客户端单次重连时间(ms)"),
+    // 新增过滤配置Schema
+    filterLongText: Schema.boolean()
+        .default(false)
+        .description("启用长文过滤"),
+    maxTextLength: Schema.number()
+        .default(300)
+        .min(50)
+        .description("最大文本长度（启用长文过滤时生效）"),
+    filterMedia: Schema.boolean()
+        .default(true)
+        .description("过滤媒体内容（图片/表情包/链接等）"),
 }).collapse().description("Websocket配置")
 
 export interface rconConf {
@@ -50,6 +65,10 @@ export interface rconConf {
     superuser: string[],
     commonCmd: string[],
     cannotCmd: string[],
+    // 新增过滤配置
+    filterLongText: boolean,
+    maxTextLength: number,
+    filterMedia: boolean,
 }
 
 export const rconConf = Schema.object({
@@ -68,6 +87,17 @@ export const rconConf = Schema.object({
     commonCmd: Schema.array(String).default(['list','spigot:tps'])
     .description('普通用户可以使用的命令'),
     cannotCmd: Schema.array(String).default(['restart','stop']).description('不能使用的命令'),
+    // 新增过滤配置Schema
+    filterLongText: Schema.boolean()
+        .default(false)
+        .description("启用长文过滤"),
+    maxTextLength: Schema.number()
+        .default(300)
+        .min(50)
+        .description("最大文本长度（启用长文过滤时生效）"),
+    filterMedia: Schema.boolean()
+        .default(true)
+        .description("过滤媒体内容（图片/表情包/链接等）"),
 }).collapse().description("RCON配置")
 
 export const eventList = ['AsyncPlayerChatEvent', 'PlayerCommandPreprocessEvent', 'PlayerDeathEvent', 'PlayerJoinEvent', 'PlayerQuitEvent'];
@@ -165,4 +195,25 @@ export function getListeningEvent(input: string | string[]): string {
 
     // 如果有多个映射结果，返回第一个
     return Array.from(uniqueEvents)[0];
+}
+
+// 新增媒体过滤正则
+export const MEDIA_REGEX = /(<img[^>]*>|\[CQ:[^\]]+\]|https?:\/\/[^\s]+)/gi;
+
+// 新增消息过滤函数
+export function filterMessage(
+    config: { filterLongText: boolean; maxTextLength: number; filterMedia: boolean },
+    content: string
+): { filtered: boolean, reason?: string } {
+    // 过滤媒体内容
+    if (config.filterMedia && MEDIA_REGEX.test(content)) {
+        return { filtered: true, reason: "包含媒体内容" };
+    }
+    
+    // 过滤长文
+    if (config.filterLongText && content.length > config.maxTextLength) {
+        return { filtered: true, reason: `消息过长 (${content.length} > ${config.maxTextLength})` };
+    }
+    
+    return { filtered: false };
 }
