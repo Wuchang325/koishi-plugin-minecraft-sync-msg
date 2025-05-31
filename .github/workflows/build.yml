@@ -1,0 +1,73 @@
+name: Build and Test Minecraft Sync Plugin
+
+on:
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      environment:
+        description: 'Environment to build for'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      skip-tests:
+        description: 'Skip tests?'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '20'  # 使用 Node.js 20 LTS
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run tests
+        if: ${{ !inputs.skip-tests }}
+        run: npm test
+
+      - name: Create artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-sync-plugin
+          path: |
+            dist/
+            package.json
+            package-lock.json
+          retention-days: 7
+
+      - name: Create release (production only)
+        if: ${{ inputs.environment == 'production' && github.ref == 'refs/heads/main' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.js
+            package.json
+            README.md
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
